@@ -1,0 +1,36 @@
+name: PoC - vercel/repository-dispatch checkout injection
+
+on:
+repository_dispatch:
+    types: [vercel.deployment.success]
+
+jobs:
+poc:
+    runs-on: ubuntu-latest
+    permissions:
+    contents: read
+    steps:
+    - name: Dump payload (safe pattern, for forensics)
+        run: |
+        echo "----- received client_payload -----"
+        echo "$PAYLOAD"
+        echo "-----------------------------------"
+        env:
+        PAYLOAD: ${{ toJSON(github.event.client_payload) }}
+
+    - name: Vulnerable action under test
+        uses: vercel/repository-dispatch/actions/checkout@v1
+
+    - name: Proof check
+        if: always()
+        run: |
+        echo "Looking for proof file..."
+        if [ -f /tmp/vercel-rd-checkout-rce ]; then
+            echo "::error::RCE CONFIRMED in vercel/repository-dispatch/actions/checkout"
+            echo "----- proof file contents -----"
+            cat /tmp/vercel-rd-checkout-rce
+            echo "-------------------------------"
+            exit 1
+        else
+            echo "No proof file present - action may have sanitized input or failed to interpolate"
+        fi
