@@ -1,0 +1,39 @@
+name: PoC - vercel/repository-dispatch debug injection
+
+on:
+  repository_dispatch:
+    types:
+      - vercel.deployment.ready
+      - vercel.deployment.success
+      - vercel.deployment.*
+
+jobs:
+  poc:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Dump payload safely
+        run: |
+          echo "----- received client_payload -----"
+          echo "$PAYLOAD"
+          echo "-----------------------------------"
+        env:
+          PAYLOAD: ${{ toJSON(github.event.client_payload) }}
+
+      - name: Vulnerable action under test
+        uses: vercel/repository-dispatch/actions/debug@v1
+
+      - name: Proof check
+        if: always()
+        run: |
+          echo "Looking for proof file..."
+          if [ -f /tmp/vercel-repository-dispatch-rce ]; then
+            echo "::error::RCE CONFIRMED in actions/debug"
+            echo "----- proof file contents -----"
+            cat /tmp/vercel-repository-dispatch-rce
+            echo "-------------------------------"
+            exit 1
+          else
+            echo "No proof file present"
+          fi
